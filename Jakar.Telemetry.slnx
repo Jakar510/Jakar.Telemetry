@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Jakar.Telemetry.Server/Jakar.Telemetry.Server.csproj" />
+  <Project Path="Jakar.Telemetry/Jakar.Telemetry.csproj" />
+</Solution>

@@ -1,0 +1,18 @@
+﻿using Jakar.Extensions;
+using Jakar.Telemetry.Server.Data.Tables;
+using Microsoft.Extensions.Options;
+using ZiggyCreatures.Caching.Fusion;
+
+namespace Jakar.Telemetry.Server.Data;
+
+
+public class Db : Database.Database
+{
+    public DbTable<ApplicationRecord> Applications { get; }
+
+
+    public Db( IConfiguration configuration, IOptions<DbOptions> options, FusionCache cache ) : base(configuration, options, cache) => Applications = Create<ApplicationRecord>();
+
+
+    protected override NpgsqlConnection CreateConnection( in SecuredString secure ) => new(secure.ToString());
+}

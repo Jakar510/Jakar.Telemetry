@@ -1,0 +1,6 @@
+@Jakar.Telemetry.Server_HostAddress = http://localhost:5155
+
+GET {{Jakar.Telemetry.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
