@@ -3,10 +3,14 @@
 
 using Jakar.Extensions;
 
+
+
 namespace Jakar.Telemetry;
 
 
-[DefaultValue(nameof(Empty))][Serializable][StructLayout(LayoutKind.Auto)]
+[DefaultValue(nameof(Empty))]
+[Serializable]
+[StructLayout(LayoutKind.Auto)]
 public readonly record struct Pair( string Key, string? Value ) : IEqualityOperators<Pair>, IComparisonOperators<Pair>
 {
     public static readonly Pair    Empty = new(string.Empty, string.Empty);
@@ -22,10 +26,10 @@ public readonly record struct Pair( string Key, string? Value ) : IEqualityOpera
 
     public int CompareTo( Pair other )
     {
-        int keyComparison = string.Compare(Key, other.Key, StringComparison.Ordinal);
+        int keyComparison = string.Compare(Key, other.Key, StringComparison.InvariantCulture);
         if ( keyComparison != 0 ) { return keyComparison; }
 
-        return string.Compare(Value, other.Value, StringComparison.Ordinal);
+        return string.Compare(Value, other.Value, StringComparison.InvariantCulture);
     }
     public int CompareTo( object? obj )
     {
@@ -45,8 +49,12 @@ public readonly record struct Pair( string Key, string? Value ) : IEqualityOpera
 
 
 
-[DefaultValue(nameof(Empty))][Serializable][StructLayout(LayoutKind.Auto)][SuppressMessage("ReSharper", "ConvertToAutoPropertyWhenPossible")][SuppressMessage("ReSharper", "ConvertToAutoPropertyWithPrivateSetter")]
-public record struct Pairs( int Capacity ) : IEnumerable<Pair>, IValueEnumerable<Pairs.Enumerator, Pair>
+[DefaultValue(nameof(Empty))]
+[Serializable]
+[StructLayout(LayoutKind.Auto)]
+[SuppressMessage("ReSharper", "ConvertToAutoPropertyWhenPossible")]
+[SuppressMessage("ReSharper", "ConvertToAutoPropertyWithPrivateSetter")]
+public record struct Pairs( int Capacity ) : IReadOnlyCollection<Pair>, IValueEnumerable<Pairs.Enumerator, Pair>
 {
     public static readonly Pairs Empty = new(0);
     private readonly Pair[]? _owner = Capacity > 0
@@ -55,6 +63,7 @@ public record struct Pairs( int Capacity ) : IEnumerable<Pair>, IValueEnumerable
     private int _length = 0;
 
 
+    public          int Count    => _length;
     public readonly int Capacity => Span.Length;
     public ref Pair this[ string key ]
     {
@@ -63,7 +72,7 @@ public record struct Pairs( int Capacity ) : IEnumerable<Pair>, IValueEnumerable
             for ( int i = 0; i < Length; i++ )
             {
                 ref Pair pair = ref Span[i];
-                if ( string.Equals(pair.Key, key, StringComparison.Ordinal) ) { return ref pair; }
+                if ( string.Equals(pair.Key, key, StringComparison.InvariantCulture) ) { return ref pair; }
             }
 
             return ref Span[_length++];
@@ -134,27 +143,28 @@ public record struct Pairs( int Capacity ) : IEnumerable<Pair>, IValueEnumerable
 
 
     [StructLayout(LayoutKind.Auto)]
-    public struct Enumerator( in Pairs tags ) : IValueEnumerator<Pair>
+    public struct Enumerator( Pairs tags ) : IValueEnumerator<Pair>
     {
-        private readonly Pairs _tags = tags;
-        private          int   index;
+        private int   index;
+        private Pairs __tags = tags;
 
 
+        public void Dispose() { __tags = Empty; }
         public bool TryGetNonEnumeratedCount( out int count )
         {
-            count = _tags._length;
+            count = __tags._length;
             return true;
         }
 
         public bool TryGetSpan( out ReadOnlySpan<Pair> span )
         {
-            span = _tags.Values;
+            span = __tags.Values;
             return true;
         }
 
         public bool TryCopyTo( Span<Pair> destination, Index offset )
         {
-            if ( EnumeratorHelper.TryGetSlice(_tags.Values, offset, destination.Length, out ReadOnlySpan<Pair> slice) )
+            if ( EnumeratorHelper.TryGetSlice(__tags.Values, offset, destination.Length, out ReadOnlySpan<Pair> slice) )
             {
                 slice.CopyTo(destination);
                 return true;
@@ -165,7 +175,7 @@ public record struct Pairs( int Capacity ) : IEnumerable<Pair>, IValueEnumerable
 
         public bool TryGetNext( out Pair current )
         {
-            ReadOnlySpan<Pair> values = _tags.Values;
+            ReadOnlySpan<Pair> values = __tags.Values;
 
             if ( index < values.Length )
             {
@@ -177,7 +187,5 @@ public record struct Pairs( int Capacity ) : IEnumerable<Pair>, IValueEnumerable
             current = Pair.Empty;
             return false;
         }
-
-        public void Dispose() { }
     }
 }

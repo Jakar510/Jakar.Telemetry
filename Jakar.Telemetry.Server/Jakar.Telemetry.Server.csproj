@@ -16,10 +16,13 @@
     <PackageReference Include="OpenTelemetry.Api" Version="1.15.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.0" />
-    <PackageReference Include="Radzen.Blazor" Version="8.7.0" />
+    <PackageReference Include="Radzen.Blazor" Version="8.7.3" />
     <PackageReference Include="Syncfusion.Blazor" Version="32.1.25" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="DbMigrations\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Jakar.Telemetry\Jakar.Telemetry.csproj" />
   </ItemGroup>
 </Project>

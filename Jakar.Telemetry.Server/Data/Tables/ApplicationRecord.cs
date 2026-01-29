@@ -1,20 +1,48 @@
-﻿namespace Jakar.Telemetry.Server.Data.Tables;
+﻿using System.ComponentModel.DataAnnotations;
+using Blazorise;
+using Syncfusion.Blazor.PivotView;
+
+
+
+namespace Jakar.Telemetry.Server.Data.Tables;
 
 
 [Table(TABLE_NAME)]
-public record ApplicationRecord( string ApplicationName, RecordID<UserRecord>? CreatedBy, RecordID<ApplicationRecord> ID, DateTimeOffset DateCreated, DateTimeOffset? LastModified = null ) : OwnedTableRecord<ApplicationRecord>(CreatedBy, ID, DateCreated, LastModified), ITableRecord<ApplicationRecord>
+public sealed record ApplicationRecord( [StringLength(512, MinimumLength = 10)] string ApplicationName, RecordID<UserRecord>? CreatedBy, RecordID<ApplicationRecord> ID, DateTimeOffset DateCreated, DateTimeOffset? LastModified = null ) : OwnedTableRecord<ApplicationRecord>(in CreatedBy, in ID, in DateCreated, in LastModified), ITableRecord<ApplicationRecord>
 {
-    private const string                                   TABLE_NAME = "Applications";
-    public static FrozenDictionary<string, ColumnMetaData> PropertyMetaData { get; }
-    public static JsonTypeInfo<ApplicationRecord[]>        JsonArrayInfo    { get; }
-    public static JsonSerializerContext                    JsonContext      { get; }
-    public static JsonTypeInfo<ApplicationRecord>          JsonTypeInfo     { get; }
-    public static string                                   TableName        => TABLE_NAME;
+    public const string TABLE_NAME = "applications";
+
+    public static FrozenDictionary<string, ColumnMetaData> PropertyMetaData { get; } = SqlTable<ApplicationRecord>.Default.WithColumn<string>(nameof(ApplicationName), length: 512)
+                                                                                                                  .With_CreatedBy()
+                                                                                                                  .Build();
+
+    public static string TableName => TABLE_NAME;
 
 
-    public static ApplicationRecord Create( string     applicationName, in RecordID<UserRecord>? createdBy, in RecordID<ApplicationRecord> id ) => new(applicationName, createdBy, id, DateTimeOffset.UtcNow);
-    public static MigrationRecord   CreateTable( ulong migrationID ) => null;
-    public static ApplicationRecord Create( DbDataReader reader )
+    public static MigrationRecord CreateTable( ulong migrationID ) => MigrationRecord.Create<ApplicationRecord>(migrationID,
+                                                                                                                $"create {TABLE_NAME} table",
+                                                                                                                $"""
+                                                                                                                 CREATE TABLE IF NOT EXISTS {TABLE_NAME}
+                                                                                                                 (
+                                                                                                                 {nameof(ApplicationName).SqlColumnName()}  bigint       PRIMARY KEY,  
+                                                                                                                 {nameof(CreatedBy).SqlColumnName()} uuid NULL, FOREIGN KEY( {nameof(CreatedBy).SqlColumnName()}) REFERENCES {UserRecord.TABLE_NAME.SqlColumnName()}(id) ON DELETE SET NULL,
+                                                                                                                 {nameof(ID).SqlColumnName()} uuid NOT NULL PRIMARY KEY,
+                                                                                                                 {nameof(DateCreated).SqlColumnName()} timestamptz NOT NULL DEFAULT SYSUTCDATETIME(),
+                                                                                                                 {nameof(LastModified).SqlColumnName()} timestamptz NULL,
+                                                                                                                 {nameof(AdditionalData).SqlColumnName()} json NULL
+                                                                                                                 );
+
+                                                                                                                 CREATE TRIGGER {nameof(MigrationRecord.SetLastModified).SqlColumnName()}
+                                                                                                                 BEFORE INSERT OR UPDATE ON {TABLE_NAME}
+                                                                                                                 FOR    EACH ROW  EXECUTE FUNCTION {
+                                                                                                                     nameof(MigrationRecord.SetLastModified)
+                                                                                                                        .SqlColumnName()
+                                                                                                                 }
+                                                                                                                 ();
+                                                                                                                 """);
+    public override ValueTask         Export( NpgsqlBinaryExporter exporter,        CancellationToken        token )                                        => default;
+    public static   ApplicationRecord Create( string               applicationName, in RecordID<UserRecord>? createdBy, in RecordID<ApplicationRecord> id ) => new(applicationName, createdBy, id, DateTimeOffset.UtcNow);
+    public static ApplicationRecord Create( NpgsqlDataReader reader )
     {
         string                      applicationName = reader.GetFieldValue<string>(nameof(ApplicationName));
         DateTimeOffset              dateCreated     = reader.GetFieldValue<DateTimeOffset>(nameof(DateCreated));

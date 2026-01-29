@@ -4,11 +4,13 @@
 using Jakar.Extensions;
 using Jakar.Telemetry.Meters;
 
+
+
 namespace Jakar.Telemetry;
 
 
 /// <summary> Represents an operation with context to be used for logging. </summary>
-public sealed class TelemetryActivity( string operationName, in TelemetryActivityContext context ) : IDisposable
+public sealed class TelemetryActivity( string operationName, in TelemetryActivityContext context ) : ITelemetryActivity<TelemetryActivity>
 {
     public const      string                   OPERATION_NAME = "OperationName";
     internal readonly TelemetryActivityContext context        = context;
@@ -18,7 +20,7 @@ public sealed class TelemetryActivity( string operationName, in TelemetryActivit
     private           DateTimeOffset?          __startTimeUtc;
     private           StatusCode?              __status;
     private           string?                  __statusDescription;
-    internal          TelemetryActivity?       parent;
+    private          TelemetryActivity?       __parent;
 
 
     public static TelemetryActivity? Current { get; set; }
@@ -28,7 +30,7 @@ public sealed class TelemetryActivity( string operationName, in TelemetryActivit
         set
         {
             field = value;
-            if ( field is not null ) { field.parent = this; }
+            if ( field is not null ) { field.__parent = this; }
         }
     }
     public TelemetryActivityContext        Context           { get => context;                init => context = value; }
@@ -40,8 +42,8 @@ public sealed class TelemetryActivity( string operationName, in TelemetryActivit
     public ActivityKind                    Kind              { get => __kind;                 init => __kind = value; }
     public TelemetryMeters                 Meters            { get;                           init; } = new();
     public string                          OperationName     { get;                           init; } = operationName;
-    public TelemetryActivityContext?       Parent            => parent?.Context;
-    public string                          SpanID            => TelemetryActivitySpanID.Collate(this);
+    public TelemetryActivityContext?       Parent            => __parent?.Context;
+    public string                          SpanID            => this.Collate(true);
     public DateTimeOffset?                 StartTimeUtc      { get => __startTimeUtc;      init => __startTimeUtc = value; }
     public StatusCode?                     Status            { get => __status;            init => __status = value; }
     public string?                         StatusDescription { get => __statusDescription; init => __statusDescription = value; }
@@ -55,6 +57,7 @@ public sealed class TelemetryActivity( string operationName, in TelemetryActivit
     public static TelemetryActivity Create( string operationName, TelemetryActivityContext context ) => new(operationName, context);
 
 
+    void ITelemetryActivity.SetStatus( StatusCode? code, string? description = null ) => SetStatus(code, description);
     public TelemetryActivity SetStatus( StatusCode? code, string? description = null )
     {
         __status = code;
@@ -83,7 +86,7 @@ public sealed class TelemetryActivity( string operationName, in TelemetryActivit
         if ( __startTimeUtc.HasValue )
         {
             __endTimeUtc ??= DateTimeOffset.UtcNow;
-            Duration   ??= __endTimeUtc.Value - __startTimeUtc.Value;
+            Duration     ??= __endTimeUtc.Value - __startTimeUtc.Value;
         }
 
         __isStopped = true;
@@ -91,10 +94,11 @@ public sealed class TelemetryActivity( string operationName, in TelemetryActivit
     }
 
 
-    public TelemetryActivity AddChild( string operationName ) => Child ??= Create(operationName, context.CreateChild(operationName)).Start();
-    public TelemetryActivity SetParent( TelemetryActivity? parentContext )
+    public TelemetryActivity AddChild( string operationName ) => Child ??= Create(operationName, context.CreateChild(operationName))
+                                                                    .Start();
+    public TelemetryActivity SetParent( TelemetryActivity? parent )
     {
-        parent = parentContext;
+        this.__parent = parent;
         return this;
     }
     public TelemetryActivity AddEvent( in TelemetryEvent value )
@@ -150,7 +154,12 @@ public sealed class TelemetryActivity( string operationName, in TelemetryActivit
 
         if ( !hasStackTrace ) { exceptionTags.Add(new Pair(EXCEPTION_STACK_TRACE_TAG, exception.ToString())); }
 
-        if ( !hasType ) { exceptionTags.Add(new Pair(EXCEPTION_TYPE_TAG, exception.GetType().ToString())); }
+        if ( !hasType )
+        {
+            exceptionTags.Add(new Pair(EXCEPTION_TYPE_TAG,
+                                       exception.GetType()
+                                                .ToString()));
+        }
 
         return AddEvent(new TelemetryEvent(EXCEPTION_EVENT_NAME, timestamp, in exceptionTags));
     }
